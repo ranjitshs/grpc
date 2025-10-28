@@ -1072,6 +1072,7 @@ Http2ClientTransport::Http2ClientTransport(
     grpc_closure* on_receive_settings)
     : channelz::DataSource(http2::CreateChannelzSocketNode(
           endpoint.GetEventEngineEndpoint(), channel_args)),
+      event_engine_(std::move(event_engine)),
       endpoint_(std::move(endpoint)),
       next_stream_id_(/*Initial Stream ID*/ 1),
       should_reset_ping_clock_(false),
@@ -1104,7 +1105,7 @@ Http2ClientTransport::Http2ClientTransport(
                             ? Duration::Infinity()
                             : Duration::Minutes(1)))),
       ping_manager_(channel_args, PingSystemInterfaceImpl::Make(this),
-                    event_engine),
+                    event_engine_),
       keepalive_manager_(
           KeepAliveInterfaceImpl::Make(this),
           ((keepalive_timeout_ < ping_timeout_) ? keepalive_timeout_
@@ -1135,7 +1136,7 @@ Http2ClientTransport::Http2ClientTransport(
 
   // Initialize the general party and write party.
   auto general_party_arena = SimpleArenaAllocator(0)->MakeArena();
-  general_party_arena->SetContext<EventEngine>(event_engine.get());
+  general_party_arena->SetContext<EventEngine>(event_engine_.get());
   general_party_ = Party::Make(std::move(general_party_arena));
 
   // The keepalive loop is only spawned if the keepalive time is not infinity.
@@ -1173,27 +1174,26 @@ void Http2ClientTransport::CloseStream(RefCountedPtr<Stream> stream,
   // TODO(akshitpatel) : [PH2][P3] : Measure the impact of holding mutex
   // throughout this function.
   bool close_transport = false;
-  {
+  GRPC_DCHECK(stream != nullptr) << "stream is null";
+  GRPC_HTTP2_CLIENT_DLOG << "Http2ClientTransport::CloseStream for stream id: "
+                         << stream->GetStreamId()
+                         << " close_reads=" << args.close_reads
+                         << " close_writes=" << args.close_writes
+                         << " location=" << whence.file() << ":"
+                         << whence.line();
+
+  if (args.close_writes) {
+    stream->SetWriteClosed();
+  }
+
+  if (args.close_reads) {
     MutexLock lock(&transport_mutex_);
-    GRPC_DCHECK(stream != nullptr) << "stream is null";
     GRPC_HTTP2_CLIENT_DLOG
         << "Http2ClientTransport::CloseStream for stream id: "
-        << stream->GetStreamId() << " close_reads=" << args.close_reads
-        << " close_writes=" << args.close_writes
-        << " location=" << whence.file() << ":" << whence.line();
-
-    if (args.close_writes) {
-      stream->SetWriteClosed();
-    }
-
-    if (args.close_reads) {
-      GRPC_HTTP2_CLIENT_DLOG
-          << "Http2ClientTransport::CloseStream for stream id: "
-          << stream->GetStreamId() << " closing stream for reads.";
-      stream_list_.erase(stream->GetStreamId());
-      if (CanCloseTransportLocked()) {
-        close_transport = true;
-      }
+        << stream->GetStreamId() << " closing stream for reads.";
+    stream_list_.erase(stream->GetStreamId());
+    if (CanCloseTransportLocked()) {
+      close_transport = true;
     }
   }
 
@@ -1327,6 +1327,7 @@ void Http2ClientTransport::CloseTransport() {
     on_receive_settings_ = nullptr;
   }
 
+  MutexLock lock(&party_mutex_);
   // This is the only place where the general_party_ is
   // reset.
   general_party_.reset();
@@ -1431,26 +1432,43 @@ Http2ClientTransport::~Http2ClientTransport() {
 
 void Http2ClientTransport::AddData(channelz::DataSink sink) {
   GRPC_HTTP2_CLIENT_DLOG << "Http2ClientTransport::AddData Begin";
-  SpawnInfallibleTransportParty(
-      "AddData", [self = RefAsSubclass<Http2ClientTransport>(),
-                  sink = std::move(sink)]() mutable {
-        GRPC_HTTP2_CLIENT_DLOG << "Http2ClientTransport::AddData Promise";
-        sink.AddData(
-            "Http2ClientTransport",
-            channelz::PropertyList()
-                .Set("keepalive_time", self->keepalive_time_)
-                .Set("keepalive_timeout", self->keepalive_timeout_)
-                .Set("ping_timeout", self->ping_timeout_)
-                .Set("keepalive_permit_without_calls",
-                     self->keepalive_permit_without_calls_)
-                .Set("settings", self->settings_.ChannelzProperties())
-                .Set("flow_control",
-                     self->flow_control_.stats().ChannelzProperties()));
-        self->general_party_->ExportToChannelz("Http2ClientTransport Party",
-                                               sink);
-        GRPC_HTTP2_CLIENT_DLOG << "Http2ClientTransport::AddData End";
-        return Empty{};
-      });
+
+  event_engine_->Run([self = RefAsSubclass<Http2ClientTransport>(),
+                      sink = std::move(sink)]() mutable {
+    {
+      // Apart from CloseTransport, this is the only place where a lock is taken
+      // to access general_party_. All other access to general_party_ happens
+      // on the general party itself and hence do not race with CloseTransport.
+      MutexLock lock(&self->party_mutex_);
+      if (self->general_party_ == nullptr) {
+        GRPC_HTTP2_CLIENT_DLOG
+            << "Http2ClientTransport::AddData general_party_ is "
+               "null. Transport is closed.";
+        return;
+      }
+    }
+
+    ExecCtx exec_ctx;
+    self->SpawnInfallibleTransportParty(
+        "AddData", [self, sink = std::move(sink)]() mutable {
+          GRPC_HTTP2_CLIENT_DLOG << "Http2ClientTransport::AddData Promise";
+          sink.AddData(
+              "Http2ClientTransport",
+              channelz::PropertyList()
+                  .Set("keepalive_time", self->keepalive_time_)
+                  .Set("keepalive_timeout", self->keepalive_timeout_)
+                  .Set("ping_timeout", self->ping_timeout_)
+                  .Set("keepalive_permit_without_calls",
+                       self->keepalive_permit_without_calls_)
+                  .Set("settings", self->settings_.ChannelzProperties())
+                  .Set("flow_control",
+                       self->flow_control_.stats().ChannelzProperties()));
+          self->general_party_->ExportToChannelz("Http2ClientTransport Party",
+                                                 sink);
+          GRPC_HTTP2_CLIENT_DLOG << "Http2ClientTransport::AddData End";
+          return Empty{};
+        });
+  });
 }
 
 ///////////////////////////////////////////////////////////////////////////////
