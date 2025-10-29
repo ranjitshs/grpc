@@ -251,7 +251,9 @@ class Http2ClientTransport final : public ClientTransport,
   void ActOnFlowControlAction(const chttp2::FlowControlAction& action,
                               RefCountedPtr<Stream> stream);
 
+  Mutex party_mutex_;
   RefCountedPtr<Party> general_party_;
+  std::shared_ptr<grpc_event_engine::experimental::EventEngine> event_engine_;
 
   PromiseEndpoint endpoint_;
   Http2SettingsManager settings_;
