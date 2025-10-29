@@ -102,3 +102,43 @@ WebJS                | [grpc-web](https://github.com/grpc/grpc-web)
 Dart                 | [grpc-dart](https://github.com/grpc/grpc-dart)
 .NET (pure C# impl.) | [grpc-dotnet](https://github.com/grpc/grpc-dotnet)
 Swift                | [grpc-swift](https://github.com/grpc/grpc-swift)
+
+## AIX Build
+- Export below tool-chain settings.
+```bash
+export LDR_CNTRL=MAXDATA=0xD0000000@DSA
+export OBJECT_MODE=64
+export CC="gcc"
+export CXX="g++  "
+export CPPFLAGS=" "
+export CFLAGS="${CPPFLAGS}   -pthread -maix64 -maltivec -mvsx  -Wl,-bbigtoc "
+export CXXFLAGS="${CPPFLAGS}  -pthread -maix64 -maltivec -mvsx -Wl,-bbigtoc  -fno-extern-tls-init "
+
+ulimit -m unlimited
+ulimit -d unlimited
+ulimit -n 2000
+ulimit -f unlimited
+```
+- Build using below.
+```bash
+cmake . -B build \
+    -DgRPC_INSTALL=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DgRPC_SSL_PROVIDER=package \
+    -DgRPC_ZLIB_PROVIDER=package \
+    -DgRPC_USE_SYSTEMD=OFF \
+    -DBUILD_SHARED_LIBS=ON \
+    -DgRPC_BUILD_TESTS=ON \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DCMAKE_INSTALL_PREFIX=$PWD/instal
+```
+
+    
+
+
+  
+  
+
+
+
