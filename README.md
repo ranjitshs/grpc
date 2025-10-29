@@ -133,8 +133,9 @@ cmake . -B build \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DCMAKE_INSTALL_PREFIX=$PWD/instal
 ```
+- Submodules patches for AIX porting
 
-    
+  https://github.com/ranjitshs/grpc/commit/6cd94e7c4c101c0595d1290de8a2b3d088bb9411    
 
 
   
