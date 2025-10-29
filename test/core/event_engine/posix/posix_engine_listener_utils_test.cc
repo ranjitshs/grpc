@@ -30,7 +30,9 @@
 // This test won't work except with posix sockets enabled
 #ifdef GRPC_POSIX_SOCKET_UTILS_COMMON
 
+#if !defined(_AIX)
 #include <ifaddrs.h>
+#endif
 
 #include "absl/log/log.h"
 #include "src/core/lib/event_engine/channel_args_endpoint_config.h"

@@ -37,7 +37,7 @@
 
 #ifdef GRPC_POSIX_SOCKET_UTILS_COMMON
 #include <errno.h>       // IWYU pragma: keep
-#include <ifaddrs.h>     // IWYU pragma: keep
+//#include <ifaddrs.h>     // IWYU pragma: keep
 #include <netinet/in.h>  // IWYU pragma: keep
 #include <sys/socket.h>  // IWYU pragma: keep
 #include <unistd.h>      // IWYU pragma: keep

@@ -110,7 +110,7 @@ class Timestamp {
   static Timestamp FromCycleCounterRoundUp(gpr_cycle_counter c);
   static Timestamp FromCycleCounterRoundDown(gpr_cycle_counter c);
 
-  static Timestamp Now() { return thread_local_time_source_->Now(); }
+  static Timestamp Now() ;
 
   static constexpr Timestamp FromMillisecondsAfterProcessEpoch(int64_t millis) {
     return Timestamp(millis);
