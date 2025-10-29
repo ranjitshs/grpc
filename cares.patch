@@ -1,0 +1,16 @@
+diff --git a/include/ares_nameser.h b/include/ares_nameser.h
+index cf0e3b2d..2789a4f3 100644
+--- a/include/ares_nameser.h
++++ b/include/ares_nameser.h
+@@ -33,9 +33,9 @@
+ #ifdef CARES_HAVE_ARPA_NAMESER_H
+ #  include <arpa/nameser.h>
+ #endif
+-#ifdef CARES_HAVE_ARPA_NAMESER_COMPAT_H
++/*#ifdef CARES_HAVE_ARPA_NAMESER_COMPAT_H
+ #  include <arpa/nameser_compat.h>
+-#endif
++#endif*/
+ 
+ /* ============================================================================
+  * arpa/nameser.h may or may not provide ALL of the below defines, so check

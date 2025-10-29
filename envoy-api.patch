@@ -1,0 +1,28 @@
+diff --git a/envoy/config/route/v3/route_components.proto b/envoy/config/route/v3/route_components.proto
+index 6225ae00..0266c1cb 100644
+--- a/envoy/config/route/v3/route_components.proto
++++ b/envoy/config/route/v3/route_components.proto
+@@ -737,7 +737,7 @@ message RouteAction {
+ 
+   enum ClusterNotFoundResponseCode {
+     // HTTP status code - 503 Service Unavailable.
+-    SERVICE_UNAVAILABLE = 0;
++    SERVICE_NOT_AVAILABLE = 0;
+ 
+     // HTTP status code - 404 Not Found.
+     NOT_FOUND = 1;
+diff --git a/envoy/type/v3/ratelimit_strategy.proto b/envoy/type/v3/ratelimit_strategy.proto
+index a86da55b..3d975f2c 100644
+--- a/envoy/type/v3/ratelimit_strategy.proto
++++ b/envoy/type/v3/ratelimit_strategy.proto
+@@ -22,8 +22,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
+ message RateLimitStrategy {
+   // Choose between allow all and deny all.
+   enum BlanketRule {
+-    ALLOW_ALL = 0;
+-    DENY_ALL = 1;
++    STRATEGY_ALLOW = 0;
++    STRATEGY_DENY = 1;
+   }
+ 
+   // Best-effort limit of the number of requests per time unit.

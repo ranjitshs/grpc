@@ -1,0 +1,105 @@
+diff --git a/absl/base/internal/low_level_alloc.cc b/absl/base/internal/low_level_alloc.cc
+index 158b6098..71f469bb 100644
+--- a/absl/base/internal/low_level_alloc.cc
++++ b/absl/base/internal/low_level_alloc.cc
+@@ -424,7 +424,7 @@ bool LowLevelAlloc::DeleteArena(Arena *arena) {
+   }
+   section.Leave();
+   arena->~Arena();
+-  Free(arena);
++  FreeMem(arena);
+   return true;
+ }
+ 
+@@ -506,7 +506,7 @@ static void AddToFreelist(void *v, LowLevelAlloc::Arena *arena)
+ 
+ // Frees storage allocated by LowLevelAlloc::Alloc().
+ // L < arena->mu
+-void LowLevelAlloc::Free(void *v) {
++void LowLevelAlloc::FreeMem(void *v) {
+   if (v != nullptr) {
+     AllocList *f = reinterpret_cast<AllocList *>(reinterpret_cast<char *>(v) -
+                                                  sizeof(f->header));
+diff --git a/absl/base/internal/low_level_alloc.h b/absl/base/internal/low_level_alloc.h
+index c2f1f25d..11596ebe 100644
+--- a/absl/base/internal/low_level_alloc.h
++++ b/absl/base/internal/low_level_alloc.h
+@@ -78,7 +78,7 @@ class LowLevelAlloc {
+   // or must have been returned from a call to Alloc() and not yet passed to
+   // Free() since that call to Alloc().  The space is returned to the arena
+   // from which it was allocated.
+-  static void Free(void *s) ABSL_ATTRIBUTE_SECTION(malloc_hook);
++  static void FreeMem(void *s) ABSL_ATTRIBUTE_SECTION(malloc_hook);
+ 
+   // ABSL_ATTRIBUTE_SECTION(malloc_hook) for Alloc* and Free
+   // are to put all callers of MallocHook::Invoke* in this module
+diff --git a/absl/synchronization/internal/create_thread_identity.cc b/absl/synchronization/internal/create_thread_identity.cc
+index 93cd376b..cf575427 100644
+--- a/absl/synchronization/internal/create_thread_identity.cc
++++ b/absl/synchronization/internal/create_thread_identity.cc
+@@ -48,7 +48,7 @@ static void ReclaimThreadIdentity(void* v) {
+   // all_locks might have been allocated by the Mutex implementation.
+   // We free it here when we are notified that our thread is dying.
+   if (identity->per_thread_synch.all_locks != nullptr) {
+-    base_internal::LowLevelAlloc::Free(identity->per_thread_synch.all_locks);
++    base_internal::LowLevelAlloc::FreeMem(identity->per_thread_synch.all_locks);
+   }
+ 
+   // We must explicitly clear the current thread's identity:
+diff --git a/absl/synchronization/internal/graphcycles.cc b/absl/synchronization/internal/graphcycles.cc
+index 129067c1..ed196ff1 100644
+--- a/absl/synchronization/internal/graphcycles.cc
++++ b/absl/synchronization/internal/graphcycles.cc
+@@ -139,7 +139,7 @@ class Vec {
+   }
+ 
+   void Discard() {
+-    if (ptr_ != space_) base_internal::LowLevelAlloc::Free(ptr_);
++    if (ptr_ != space_) base_internal::LowLevelAlloc::FreeMem(ptr_);
+   }
+ 
+   void Grow(uint32_t n) {
+@@ -383,10 +383,10 @@ GraphCycles::~GraphCycles() {
+   for (auto* node : rep_->nodes_) {
+     if (node == nullptr) { continue; }
+     node->Node::~Node();
+-    base_internal::LowLevelAlloc::Free(node);
++    base_internal::LowLevelAlloc::FreeMem(node);
+   }
+   rep_->Rep::~Rep();
+-  base_internal::LowLevelAlloc::Free(rep_);
++  base_internal::LowLevelAlloc::FreeMem(rep_);
+ }
+ 
+ bool GraphCycles::CheckInvariants() const {
+diff --git a/absl/synchronization/mutex.cc b/absl/synchronization/mutex.cc
+index 5091b8fd..a9510809 100644
+--- a/absl/synchronization/mutex.cc
++++ b/absl/synchronization/mutex.cc
+@@ -360,7 +360,7 @@ static SynchEvent* EnsureSynchEvent(std::atomic<intptr_t>* addr,
+       for (auto* e = head; e != nullptr;) {
+         SynchEvent* next = e->next;
+         if (--(e->refcount) == 0) {
+-          base_internal::LowLevelAlloc::Free(e);
++          base_internal::LowLevelAlloc::FreeMem(e);
+         }
+         e = next;
+       }
+@@ -403,7 +403,7 @@ static void UnrefSynchEvent(SynchEvent* e) {
+     bool del = (--(e->refcount) == 0);
+     synch_event_mu.Unlock();
+     if (del) {
+-      base_internal::LowLevelAlloc::Free(e);
++      base_internal::LowLevelAlloc::FreeMem(e);
+     }
+   }
+ }
+@@ -1367,7 +1367,7 @@ struct ScopedDeadlockReportBuffers {
+     b = reinterpret_cast<DeadlockReportBuffers*>(
+         base_internal::LowLevelAlloc::Alloc(sizeof(*b)));
+   }
+-  ~ScopedDeadlockReportBuffers() { base_internal::LowLevelAlloc::Free(b); }
++  ~ScopedDeadlockReportBuffers() { base_internal::LowLevelAlloc::FreeMem(b); }
+   DeadlockReportBuffers* b;
+ };
+ 
